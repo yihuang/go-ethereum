@@ -259,16 +259,16 @@ func (evm *EVM) Call(caller common.Address, addr common.Address, input []byte, g
 	}
 	evm.Context.Transfer(evm.StateDB, caller, addr, value)
 
+	// The contract is a scoped environment for this execution context only.
+	contract := NewContract(caller, addr, value, gas, evm.jumpDests)
 	if isPrecompile {
-		ret, gas, err = evm.RunPrecompiledContract(p, caller, input, gas, value, false, evm.Config.Tracer)
+		ret, gas, err = evm.RunPrecompiledContract(p, contract, input, false)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		code := evm.resolveCode(addr)
 		if len(code) == 0 {
 			ret, err = nil, nil // gas is unchanged
 		} else {
-			// The contract is a scoped environment for this execution context only.
-			contract := NewContract(caller, addr, value, gas, evm.jumpDests)
 			contract.IsSystemCall = isSystemCall(caller)
 			contract.SetCallCode(evm.resolveCodeHash(addr), code)
 			ret, err = evm.interpreter.Run(contract, input, false)
@@ -326,12 +326,12 @@ func (evm *EVM) CallCode(caller common.Address, addr common.Address, input []byt
 	var snapshot = evm.StateDB.Snapshot()
 
 	// It is allowed to call precompiles, even via delegatecall
+	contract := NewContract(caller, caller, value, gas, evm.jumpDests)
 	if p, isPrecompile := evm.Precompile(addr); isPrecompile {
-		ret, gas, err = evm.RunPrecompiledContract(p, caller, input, gas, value, true, evm.Config.Tracer)
+		ret, gas, err = evm.RunPrecompiledContract(p, contract, input, false)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
-		contract := NewContract(caller, caller, value, gas, evm.jumpDests)
 		contract.SetCallCode(evm.resolveCodeHash(addr), evm.resolveCode(addr))
 		ret, err = evm.interpreter.Run(contract, input, false)
 		gas = contract.Gas
@@ -372,13 +372,13 @@ func (evm *EVM) DelegateCall(originCaller common.Address, caller common.Address,
 	var snapshot = evm.StateDB.Snapshot()
 
 	// It is allowed to call precompiles, even via delegatecall
+	contract := NewContract(originCaller, caller, value, gas, evm.jumpDests)
 	if p, isPrecompile := evm.Precompile(addr); isPrecompile {
-		ret, gas, err = evm.RunPrecompiledContract(p, caller, input, gas, nil, true, evm.Config.Tracer)
+		ret, gas, err = evm.RunPrecompiledContract(p, contract, input, false)
 	} else {
 		// Initialise a new contract and make initialise the delegate values
 		//
 		// Note: The value refers to the original value from the parent call.
-		contract := NewContract(originCaller, caller, value, gas, evm.jumpDests)
 		contract.SetCallCode(evm.resolveCodeHash(addr), evm.resolveCode(addr))
 		ret, err = evm.interpreter.Run(contract, input, false)
 		gas = contract.Gas
@@ -427,12 +427,12 @@ func (evm *EVM) StaticCall(caller common.Address, addr common.Address, input []b
 	// future scenarios
 	evm.StateDB.AddBalance(addr, new(uint256.Int), tracing.BalanceChangeTouchAccount)
 
+	contract := NewContract(caller, addr, new(uint256.Int), gas, evm.jumpDests)
 	if p, isPrecompile := evm.Precompile(addr); isPrecompile {
-		ret, gas, err = evm.RunPrecompiledContract(p, caller, input, gas, new(uint256.Int), true, evm.Config.Tracer)
+		ret, gas, err = evm.RunPrecompiledContract(p, contract, input, true)
 	} else {
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
-		contract := NewContract(caller, addr, new(uint256.Int), gas, evm.jumpDests)
 		contract.SetCallCode(evm.resolveCodeHash(addr), evm.resolveCode(addr))
 
 		// When an error was returned by the EVM or when setting the creation code

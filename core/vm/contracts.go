@@ -37,7 +37,6 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/crypto/secp256r1"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/holiman/uint256"
 	"golang.org/x/crypto/ripemd160"
 )
 
@@ -259,25 +258,29 @@ func ActivePrecompiles(rules params.Rules) []common.Address {
 // - the returned bytes,
 // - the _remaining_ gas,
 // - any error that occurred
+//
+// readOnly is true for StaticCall, it's the equivalence of `interpreter.readOnly` for precompiles.
 func (evm *EVM) RunPrecompiledContract(
 	p PrecompiledContract,
-	caller common.Address,
+	contract *Contract,
 	input []byte,
-	suppliedGas uint64,
-	value *uint256.Int,
+	readOnly bool,
+) (ret []byte, remainingGas uint64, err error) {
+	return runPrecompiledContract(evm, p, contract, input, readOnly, evm.Config.Tracer)
+}
+
+func runPrecompiledContract(
+	evm *EVM,
+	p PrecompiledContract,
+	contract *Contract,
+	input []byte,
 	readOnly bool,
 	logger *tracing.Hooks,
 ) (ret []byte, remainingGas uint64, err error) {
-	return runPrecompiledContract(evm, p, caller, input, suppliedGas, value, readOnly, logger)
-}
-
-func runPrecompiledContract(evm *EVM, p PrecompiledContract, caller common.Address, input []byte, suppliedGas uint64,
-	value *uint256.Int, readOnly bool, logger *tracing.Hooks) (ret []byte, remainingGas uint64, err error) {
-	addrCopy := p.Address()
 	inputCopy := make([]byte, len(input))
 	copy(inputCopy, input)
 
-	contract := NewPrecompile(caller, addrCopy, value, suppliedGas)
+	contract.isPrecompile = true
 	contract.Input = inputCopy
 
 	gasCost := p.RequiredGas(input)
