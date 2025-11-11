@@ -179,6 +179,19 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 	// as every returning call will return new data anyway.
 	in.returnData = nil
 
+	if contract.Precompile != nil {
+		contract.Input = input
+
+		// consume static gas
+		gasCost := contract.Precompile.RequiredGas(input)
+		if !contract.UseGas(gasCost, in.evm.Config.Tracer, tracing.GasChangeCallPrecompiledContract) {
+			return nil, ErrOutOfGas
+		}
+
+		// execute precompile
+		return contract.Precompile.Run(in.evm, contract)
+	}
+
 	// Don't bother with the execution if there's no code.
 	if len(contract.Code) == 0 {
 		return nil, nil

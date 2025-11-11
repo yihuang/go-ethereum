@@ -20,11 +20,10 @@ func (ar AccountRef) Address() common.Address { return (common.Address)(ar) }
 // NewPrecompile returns a new instance of a precompiled contract environment for the execution of EVM.
 func NewPrecompile(caller, address common.Address, value *uint256.Int, gas uint64) *Contract {
 	c := NewContract(caller, address, value, gas, nil)
-	c.isPrecompile = true
 	return c
 }
 
 // IsPrecompile returns true if the contract is a precompiled contract environment
 func (c *Contract) IsPrecompile() bool {
-	return c.isPrecompile
+	return c.Precompile != nil
 }

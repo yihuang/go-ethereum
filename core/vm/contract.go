@@ -42,9 +42,11 @@ type Contract struct {
 	IsDeployment bool
 	IsSystemCall bool
 
-	Gas          uint64
-	value        *uint256.Int
-	isPrecompile bool
+	Gas   uint64
+	value *uint256.Int
+
+	// Precompile is exclusive with Code
+	Precompile PrecompiledContract
 }
 
 // NewContract returns a new contract environment for the execution of EVM.
@@ -63,10 +65,6 @@ func NewContract(caller common.Address, address common.Address, value *uint256.I
 }
 
 func (c *Contract) validJumpdest(dest *uint256.Int) bool {
-	if c.isPrecompile {
-		return false
-	}
-
 	udest, overflow := dest.Uint64WithOverflow()
 	// PC cannot go beyond len(code) and certainly can't be bigger than 63bits.
 	// Don't bother checking for JUMPDEST in that case.
@@ -83,10 +81,6 @@ func (c *Contract) validJumpdest(dest *uint256.Int) bool {
 // isCode returns true if the provided PC location is an actual opcode, as
 // opposed to a data-segment following a PUSHN operation.
 func (c *Contract) isCode(udest uint64) bool {
-	if c.isPrecompile {
-		return false
-	}
-
 	// Do we already have an analysis laying around?
 	if c.analysis != nil {
 		return c.analysis.codeSegment(udest)
@@ -169,9 +163,10 @@ func (c *Contract) Value() *uint256.Int {
 
 // SetCallCode sets the code of the contract,
 func (c *Contract) SetCallCode(hash common.Hash, code []byte) {
-	if c.isPrecompile {
-		return
-	}
 	c.Code = code
 	c.CodeHash = hash
+}
+
+func (c *Contract) SetPrecompile(pc PrecompiledContract) {
+	c.Precompile = pc
 }
